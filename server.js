@@ -140,7 +140,6 @@ app.post('/signup', async (req, res) => {
         });
 
     const validationResult = schema.validate(req.body);
-    console.log(validationResult.error.details[0].message);
     if(validationResult.error){
         console.log("Validation failed");
         res.render('signupError', { error: validationResult.error.details[0].message });
