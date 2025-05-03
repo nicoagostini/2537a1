@@ -66,7 +66,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-    res.render('login');
+    res.render('login', { error: null });
     return;
 });
 
@@ -95,6 +95,7 @@ app.post('/login', async (req, res) => {
     try{
         
         var user = await db.collection('users').findOne({ username: username });
+
         if(user.username == username){
             if(bcrypt.compareSync(password, user.password)){
                 req.session.authenticated = true;
@@ -105,16 +106,16 @@ app.post('/login', async (req, res) => {
                 return;
             }
             console.log("Invalid password but checking");
-            res.redirect('/login');
+            res.render('login', { error: 'Invalid password' });
             return;
         }
-        console.log("Invalid username or password yolo");
-        res.redirect('/login');
+        console.log("Invalid username ");
+        res.render('login', { error: 'Invalid Email' });
         return;
 
     }catch(e){
         console.log("User not found");
-        res.redirect('/login');
+        res.render('login', { error: 'User not found' });
         return;
     }
 
