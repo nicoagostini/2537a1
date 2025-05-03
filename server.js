@@ -2,15 +2,16 @@ const express = require('express');
 const dotenv = require('dotenv');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
-const MongoStore = require('connect-mongo');
+const MongoStore = require('connect-mongo'); 
 const MongoClient = require('mongodb').MongoClient;
+const Joi = require('joi');
 
 
 dotenv.config();
 
 const saltRounds = Number(process.env.SALT_ROUNDS);
 
-const expireTime = Number(process.env.EXPIRE_TIME);
+const expireTime = parseInt(process.env.EXPIRE_TIME);
 
 const port = process.env.PORT || 3000;
 
@@ -20,16 +21,15 @@ const client = new MongoClient(mongoUri);
 
 const app = express();
 
+app.set('view engine', 'ejs');
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-var mongoStore = MongoStore.create({
-    mongoUrl: mongoUri,
-    crypto: {
-        secret: process.env.SESSION_SECRET
-    }
-});
+
+app.use("/public", express.static("./public"));
+
 
 async function connectToDB() {
     try {
@@ -45,38 +45,70 @@ async function connectToDB() {
 
 app.use(session({
     secret: process.env.SESSION_SECRET,
-    store: mongoStore,
+    store: MongoStore.create({ mongoUrl: mongoUri, crypto: { secret: process.env.SESSION_SECRET } }),
     resave: true,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+        maxAge: 600000
+    }
 }));
 
 app.get('/', (req, res) => {
-    res.sendFile('index.html', { root: __dirname });
+
+    if(!req.session.authenticated){
+        console.log("User not authenticated");
+        res.render('index', { session: req.session });
+        return;
+    }
+    console.log("User authenticated");
+    res.render('index', { session: req.session });
     return;
 });
 
 app.get('/login', (req, res) => {
-    res.sendFile('login.html', { root: __dirname });
+    res.render('login');
     return;
 });
 
 app.post('/login', async (req, res) => {
+    
+    if(req.session.authenticated){
+        console.log("User already logged in");
+        res.redirect('/members');
+        return;
+    }
+
     var { username, password } = req.body;
     var db = await connectToDB();
 
+    const schema = Joi.object(
+        {
+        username: Joi.string().email().required(),
+        password: Joi.string().max(20).required()
+        });
+    const validationResult = schema.validate(req.body);
+    if(validationResult.error){
+        console.log("Validation failed");
+        res.render('signupError', { error: validationResult.error.details[0].message });
+        return;
+    }
     try{
+        
         var user = await db.collection('users').findOne({ username: username });
         if(user.username == username){
             if(bcrypt.compareSync(password, user.password)){
                 req.session.authenticated = true;
-                req.session.username = username;
-                req.session.cookie.maxAge = expireTime;
+                req.session.name = user.name;
                 console.log("User logged in");
+                console.log(req.session);
                 res.redirect('/members');
                 return;
             }
+            console.log("Invalid password but checking");
+            res.redirect('/login');
+            return;
         }
-        console.log("Invalid username or password");
+        console.log("Invalid username or password yolo");
         res.redirect('/login');
         return;
 
@@ -96,18 +128,51 @@ app.get('/logout', (req, res) => {
 });
 
 app.get('/signup', (req, res) => {
-    res.sendFile('signup.html', { root: __dirname });
+    res.render('signup');
 });
 app.post('/signup', async (req, res) => {
+
+    const schema = Joi.object(
+        {
+        name: Joi.string().alphanum().max(20).required(),   
+        username: Joi.string().email().required(),
+        password: Joi.string().max(20).required()
+        });
+
+    const validationResult = schema.validate(req.body);
+    console.log(validationResult.error.details[0].message);
+    if(validationResult.error){
+        console.log("Validation failed");
+        res.render('signupError', { error: validationResult.error.details[0].message });
+        return;
+    }
     var { name, username, password } = req.body;
+    if(!name){
+        res.render('signupError', { error: 'Name is required' });
+        return;
+    }
+    if(!username){
+        res.render('signupError', { error: 'Email is required' });
+        return;
+    }
+    if(!password){
+        res.render('signupError', { error: 'Password is required' });
+        return;
+    }
+
+    var db = await connectToDB();
+
+    if(await db.collection('users').findOne({ username: username })) {
+        res.render('signupError', { error: 'Email already exists' });
+        return;
+    }
+
     var hashedPassword = await bcrypt.hash(password, saltRounds);
     var user = {
         name: name,
         username: username,
         password: hashedPassword
     };
-    
-    var db = await connectToDB();
 
     try{
         await db.collection('users').insertOne(user);
@@ -123,13 +188,14 @@ app.post('/signup', async (req, res) => {
 })
 
 app.get('/members', (req, res) => {
-    // if(!req.session.authenticated){
-    //     console.log("User not authenticated");
-    //     res.redirect('/login');
-    //     return;
-    // }
+    if(!req.session.authenticated){
+        console.log("User not authenticated");
+        res.redirect('/login');
+        return;
+    }
+    var randImgId = Math.floor(Math.random() * 3) + 1;
     console.log("User authenticated");
-    res.sendFile('members.html', { root: __dirname });
+    res.render('members', { name: req.session.name , imageId: randImgId});
     return;
 })
 

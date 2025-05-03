@@ -7,17 +7,15 @@
             <h1>Members</h1>
             <nav>
                 <ul>
-                    <li><a href="/login">Login</a></li>
-                    <li><a href="/signup">Signup</a></li>
                     <li><a href="/members">Members</a></li>
                     <li><a href="/logout">Logout</a></li>
                 </ul>
             </nav>
         </header>
         <main>
-            <h2>Contents</h2>
-            <span>All the data you're looking for</span>
-
+            <h3>Hello, <span id="username"><%= name %></span>!</h3>
+            <h2>Check this out:</h2>
+            <img src="/public/<%= imageId %>.jpg" alt="Random Image" width="800" height="600">
         </main>
     </body>
 </html>

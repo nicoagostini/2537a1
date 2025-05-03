@@ -8,16 +8,20 @@
         <h1>Home</h1>
         <nav>
             <ul>
+                <% if(!session.authenticated){ %>
                 <li><a href="/login">Login</a></li>
                 <li><a href="/signup">Signup</a></li>
+                <% }else{ %>
+                    <p>Welcome <b><%= session.name %></b></p>
                 <li><a href="/members">Members</a></li>
                 <li><a href="/logout">Logout</a></li>
+                <% } %>
             </ul>
         </nav>
     </header>
     <main>
-        <h2>Contents</h2>
-        <span>All the data you're looking for</span>
+        <h2>Stay tuned</h2>
+        <span>More content to come</span>
     </main>
 </body>
 </html>
